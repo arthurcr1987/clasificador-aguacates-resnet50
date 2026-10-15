@@ -1,3 +1,99 @@
+"""TecNM Virtual - Visión Inteligente - Actividad 4.3.
+Interfaz web para clasificar aguacates con ResNet50, LiteRT y Gradio 6.
+"""
+
+from pathlib import Path
+import base64
+import html
+import time
+
+import gradio as gr
+import numpy as np
+from ai_edge_litert.interpreter import Interpreter
+from PIL import Image
+
+ROOT = Path(__file__).resolve().parent.parent
+MODEL_PATH = ROOT / "models" / "resnet50_aguacates_finetuning.tflite"
+ASSETS = ROOT / "assets"
+
+
+def imagen_base64(nombre):
+    """Convierte una imagen local en una URL incrustada, sin controles de Gradio."""
+    ruta = ASSETS / nombre
+    if not ruta.is_file():
+        return None
+    extension = ruta.suffix.lower()
+    mime = "image/png" if extension == ".png" else "image/jpeg"
+    contenido = base64.b64encode(ruta.read_bytes()).decode("ascii")
+    return f"data:{mime};base64,{contenido}"
+
+
+def cargar_modelo():
+    if not MODEL_PATH.is_file():
+        raise FileNotFoundError(f"No se encontró el modelo: {MODEL_PATH}")
+    interprete = Interpreter(model_path=str(MODEL_PATH), num_threads=1)
+    interprete.allocate_tensors()
+    entrada = interprete.get_input_details()[0]
+    salida = interprete.get_output_details()[0]
+    if tuple(entrada["shape"]) != (1, 224, 224, 3) or tuple(salida["shape"]) != (1, 1):
+        raise ValueError("Las dimensiones del modelo no coinciden con el pipeline original.")
+    if entrada["dtype"] != np.float32 or salida["dtype"] != np.float32:
+        raise ValueError("El modelo requiere un formato de entrada o salida distinto a float32.")
+    return interprete, entrada["index"], salida["index"]
+
+
+interprete, indice_entrada, indice_salida = cargar_modelo()
+
+ESPERA = '<div class="resultado espera">Carga una fotografía y presiona «Clasificar aguacate».</div>'
+
+
+def clasificar(imagen):
+    if imagen is None:
+        return ESPERA, "", "", ESPERA
+
+    inicio = time.perf_counter()
+    # El modelo entrenado ya incorpora preprocess_input: no normalizar nuevamente.
+    imagen = imagen.convert("RGB").resize((224, 224), Image.Resampling.BILINEAR)
+    lote = np.expand_dims(np.asarray(imagen, dtype=np.float32), axis=0)
+    interprete.set_tensor(indice_entrada, lote)
+    interprete.invoke()
+    prob_limpio = float(interprete.get_tensor(indice_salida)[0][0])
+    duracion = time.perf_counter() - inicio
+
+    if not np.isfinite(prob_limpio) or not 0 <= prob_limpio <= 1:
+        raise ValueError("La salida del modelo no es una probabilidad válida.")
+
+    limpio = prob_limpio >= 0.5
+    clase = "Aguacate limpio" if limpio else "Aguacate dañado"
+    confianza = prob_limpio if limpio else 1.0 - prob_limpio
+    estado = "limpio" if limpio else "danado"
+    resultado = (
+        f'<div class="resultado {estado}">'
+        '<div class="resultado-label">Predicción del modelo</div>'
+        f'<div class="resultado-clase">{html.escape(clase)}</div>'
+        f'<div class="confianza">Confianza: <strong>{confianza * 100:.2f}%</strong></div>'
+        f'<div class="barra"><span style="width:{confianza * 100:.2f}%"></span></div>'
+        '</div>'
+    )
+    return resultado, f"{duracion:.4f} segundos", "224 × 224 píxeles", resultado
+
+
+def limpiar_campos():
+    return None, ESPERA, "", "", ESPERA
+
+
+logos = []
+for nombre, alternativo in (
+    ("tecnm.png", "Tecnológico Nacional de México"),
+    ("tec.png", "Instituto Tecnológico Superior de Uruapan"),
+    ("maestria.png", "Maestría en Inteligencia Artificial"),
+):
+    fuente = imagen_base64(nombre)
+    if fuente:
+        logos.append(f'<img src="{fuente}" alt="{html.escape(alternativo)}">')
+    else:
+        logos.append(f'<span class="logo-faltante">Falta {html.escape(nombre)}</span>')
+
 encabezado_logos = '<div class="logos-institucionales">' + "".join(logos) + '</div>'
 
 banner = imagen_base64("banner_aguacates.png")
