@@ -19,7 +19,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copiar archivos del proyecto
 COPY src/ ./src/
-COPY models/ ./models/
+RUN mkdir -p models
+ADD https://media.githubusercontent.com/media/arthurcr1987/clasificador-aguacates-resnet50/main/models/resnet50_aguacates_finetuning.keras /app/models/resnet50_aguacates_finetuning.keras
 COPY assets/ ./assets/
 
 # Crear carpetas de resultados y registros
