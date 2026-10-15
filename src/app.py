@@ -1,91 +1,3 @@
-"""TecNM Virtual - Visión Inteligente - Actividad 4.3.
-Interfaz web para clasificar aguacates con ResNet50 y Gradio 6.
-"""
-
-from pathlib import Path
-import base64
-import html
-import time
-
-import gradio as gr
-import numpy as np
-import tensorflow as tf
-from PIL import Image
-
-ROOT = Path(__file__).resolve().parent.parent
-MODEL_PATH = ROOT / "models" / "resnet50_aguacates_finetuning.keras"
-ASSETS = ROOT / "assets"
-
-
-def imagen_base64(nombre):
-    """Convierte una imagen local en una URL incrustada, sin controles de Gradio."""
-    ruta = ASSETS / nombre
-    if not ruta.is_file():
-        return None
-    extension = ruta.suffix.lower()
-    mime = "image/png" if extension == ".png" else "image/jpeg"
-    contenido = base64.b64encode(ruta.read_bytes()).decode("ascii")
-    return f"data:{mime};base64,{contenido}"
-
-
-def cargar_modelo():
-    if not MODEL_PATH.is_file():
-        raise FileNotFoundError(f"No se encontró el modelo: {MODEL_PATH}")
-    red = tf.keras.models.load_model(MODEL_PATH, compile=False)
-    if red.input_shape[1:] != (224, 224, 3) or red.output_shape[-1] != 1:
-        raise ValueError("Las dimensiones del modelo no coinciden con el pipeline original.")
-    return red
-
-
-modelo = cargar_modelo()
-
-ESPERA = '<div class="resultado espera">Carga una fotografía y presiona «Clasificar aguacate».</div>'
-
-
-def clasificar(imagen):
-    if imagen is None:
-        return ESPERA, "", "", ESPERA
-
-    inicio = time.perf_counter()
-    # El modelo entrenado ya incorpora preprocess_input: no normalizar nuevamente.
-    imagen = imagen.convert("RGB").resize((224, 224), Image.Resampling.BILINEAR)
-    lote = np.expand_dims(np.asarray(imagen, dtype=np.float32), axis=0)
-    prob_limpio = float(modelo.predict(lote, verbose=0)[0][0])
-    duracion = time.perf_counter() - inicio
-
-    if not np.isfinite(prob_limpio) or not 0 <= prob_limpio <= 1:
-        raise ValueError("La salida del modelo no es una probabilidad válida.")
-
-    limpio = prob_limpio >= 0.5
-    clase = "Aguacate limpio" if limpio else "Aguacate dañado"
-    confianza = prob_limpio if limpio else 1.0 - prob_limpio
-    estado = "limpio" if limpio else "danado"
-    resultado = (
-        f'<div class="resultado {estado}">'
-        '<div class="resultado-label">Predicción del modelo</div>'
-        f'<div class="resultado-clase">{html.escape(clase)}</div>'
-        f'<div class="confianza">Confianza: <strong>{confianza * 100:.2f}%</strong></div>'
-        f'<div class="barra"><span style="width:{confianza * 100:.2f}%"></span></div>'
-        '</div>'
-    )
-    return resultado, f"{duracion:.4f} segundos", "224 × 224 píxeles", resultado
-
-
-def limpiar_campos():
-    return None, ESPERA, "", "", ESPERA
-
-
-logos = []
-for nombre, alternativo in (
-    ("tecnm.png", "Tecnológico Nacional de México"),
-    ("tec.png", "Instituto Tecnológico Superior de Uruapan"),
-    ("maestria.png", "Maestría en Inteligencia Artificial"),
-):
-    fuente = imagen_base64(nombre)
-    if fuente:
-        logos.append(f'<img src="{fuente}" alt="{html.escape(alternativo)}">')
-    else:
-        logos.append(f'<span class="logo-faltante">Falta {html.escape(nombre)}</span>')
 
 encabezado_logos = '<div class="logos-institucionales">' + "".join(logos) + '</div>'
 
@@ -167,7 +79,7 @@ with gr.Blocks(title="Clasificador Inteligente de Aguacates") as demo:
             gr.HTML(
                 '<div class="tarjetas">'
                 '<div class="tarjeta"><strong>ResNet50</strong><span>Fine-Tuning</span></div>'
-                '<div class="tarjeta"><strong>TensorFlow</strong><span>Motor de inferencia</span></div>'
+                '<div class="tarjeta"><strong>TensorFlow Lite</strong><span>Motor de inferencia</span></div>'
                 '<div class="tarjeta"><strong>Docker + Gradio</strong><span>Aplicación web</span></div>'
                 '</div>'
             )
@@ -195,7 +107,7 @@ with gr.Blocks(title="Clasificador Inteligente de Aguacates") as demo:
                 "**Resolución de entrada:** 224 × 224 píxeles\n\n"
                 "**Clases:** Aguacate limpio y aguacate dañado\n\n"
                 "**Lenguaje:** Python 3.11.9\n\n"
-                "**Framework:** TensorFlow 2.21.0\n\n"
+                "**Motor de inferencia web:** LiteRT (TensorFlow Lite)\n\n"
                 "**Tecnologías:** Gradio y Docker"
             )
             gr.Markdown("**Nota:** la confianza es una salida del modelo y no garantiza que la clasificación sea correcta.")
