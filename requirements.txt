@@ -1,0 +1,14 @@
+# ============================================================
+# ITESU - TecNM Virtual - Maestría en Inteligencia Artificial
+# Materia: Visión Inteligente
+# Unidad 4 - Actividad 4.3: Paquete Profesional y Video-Demo
+# Proyecto: Clasificación de Aguacates mediante ResNet50
+# Alumno: Arturo Campos Rodríguez
+# Python 3.11.9
+# ============================================================
+
+tensorflow==2.21.0
+numpy
+pandas
+Pillow
+gradio>=5.0,<7.0
