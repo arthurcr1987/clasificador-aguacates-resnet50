@@ -1,4 +1,3 @@
-
 encabezado_logos = '<div class="logos-institucionales">' + "".join(logos) + '</div>'
 
 banner = imagen_base64("banner_aguacates.png")
@@ -107,7 +106,7 @@ with gr.Blocks(title="Clasificador Inteligente de Aguacates") as demo:
                 "**Resolución de entrada:** 224 × 224 píxeles\n\n"
                 "**Clases:** Aguacate limpio y aguacate dañado\n\n"
                 "**Lenguaje:** Python 3.11.9\n\n"
-                "**Motor de inferencia web:** LiteRT (TensorFlow Lite)\n\n"
+                "**Motor de inferencia:** LiteRT (TensorFlow Lite)\n\n"
                 "**Tecnologías:** Gradio y Docker"
             )
             gr.Markdown("**Nota:** la confianza es una salida del modelo y no garantiza que la clasificación sea correcta.")
